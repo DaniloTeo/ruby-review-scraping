@@ -3,7 +3,7 @@
 require 'selenium-webdriver'
 
 def print_status(str)
-  print "[STATUS] #{str}\n"
+  print "[STATUS] #{str}\n\n"
 end
 
 def initialize_scraper
@@ -116,7 +116,8 @@ def month_to_number(month_name)
 end
 
 def clean_timestamp(timestamp)
-  day = timestamp.scan(/\w ([0-9]{2})/)[0][0]
+  day = timestamp.scan(/\w ([0-9]{1,2})/)[0][0]
+  day = "0#{day}" if day.length < 2
   month = month_to_number(timestamp.scan(/[A-Z]+/)[0])
   year = timestamp.scan(/, ([0-9]{4})/)[0][0]
   "#{year}-#{month}-#{day}"
@@ -130,10 +131,17 @@ def clean_body(paragraphs)
   body
 end
 
+def review?(cat)
+  cat.scan(/REVIEWS/) != []
+end
+
 def gather_review_data(review_link)
   print_status("Gathering data from #{review_link}...")
   @driver.get(review_link)
   @wait.until { @driver.find_element(:css, 'footer.main-footer').displayed? }
+  cat = @driver.find_element(:css, 'span.cats > a').text
+  return unless review?(cat)
+
   header_list = @driver.find_elements(:css, 'h2')
   title_issue = header_list[0].text
   publisher = header_list[1].text
@@ -152,7 +160,7 @@ def gather_review_data(review_link)
   end
   score_number = nil
   score_number = score.to_f unless score.nil?
-
+  #   .cats > a:nth-child(1)
   {
     title: title_issue,
     publisher: publisher,
@@ -173,13 +181,13 @@ def gather_reviews(links)
   reviews
 end
 
-def scrape
+def scrape(author)
   # initialize chrome webdriver with selenium globally
   # initialize explicit wait options
   print_status('Initializing webdriver...')
   initialize_scraper
   # navigate to author's url in website
-  @driver.get('https://sequentialplanet.com/author/dteo/')
+  @driver.get("https://sequentialplanet.com/author/#{author}/")
 
   # wait until the page's footer is displayed in browser
   @wait.until { @driver.find_element(:css, 'footer.main-footer').displayed? }
@@ -194,9 +202,9 @@ def scrape
   reviews = gather_reviews(links)
 
   File.write('./review.json', JSON.dump(reviews))
-  # screen shot to assert we're where we want
-  @driver.save_screenshot('./sp.png')
 end
 
 # call main function
-scrape
+print "Enter author's slug: "
+author = gets.chomp
+scrape(author)
